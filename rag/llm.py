@@ -58,6 +58,8 @@ def generate_answer(question: str, context: str, chunks: List[Chunk], status: st
 
     # Post-validate: ensure Источник exists; if absent, append
     if "Источник:" not in text:
-        src = "; ".join(unique_paths[: max(2, min(5, len(unique_paths)))]) or "—"
+        from pathlib import Path as _P
+        display_paths = [str(_P(p).with_suffix("")) for p in unique_paths]
+        src = "; ".join(display_paths[: max(2, min(5, len(display_paths)))]) or "—"
         text = text + f"\nИсточник: {src}"
     return text

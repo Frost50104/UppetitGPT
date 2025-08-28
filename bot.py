@@ -4,7 +4,8 @@ import re
 from urllib.parse import unquote
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Optional
+import html
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
@@ -20,6 +21,148 @@ settings = get_settings()
 # --- Images support settings ---
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_RETURN_PHOTOS = 3
+TELEGRAM_MSG_LIMIT = 4096
+
+
+def read_text_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return path.read_text(errors="ignore")
+
+
+IMG_MD_RE = re.compile(r"!\[[^\]]*\]\(([^)]+?\.(?:jpg|jpeg|png|webp|gif))\)", re.IGNORECASE)
+IMG_PHOTO_RE = re.compile(r"(?:^|\s)(?:фото|photo)\s*:\s*(.+?\.(?:jpg|jpeg|png|webp|gif))", re.IGNORECASE)
+# Markdown links like [Text](https://...)
+MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
+# Raw links to catch presence even without markdown
+LINK_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+
+
+def split_markdown_into_segments(md: str) -> List[Tuple[str, Optional[str]]]:
+    """
+    Разбивает Markdown на последовательность (text, image_path_or_None),
+    сохраняя порядок появления картинок.
+    Между картинками возвращаются текстовые сегменты (включая переносы).
+    """
+    segments: List[Tuple[str, Optional[str]]] = []
+
+    # Список всех изображений в тексте: markdown и "фото: ..."
+    matches: List[Tuple[int, int, str]] = []  # (start, end, raw_path)
+
+    for m in IMG_MD_RE.finditer(md):
+        matches.append((m.start(), m.end(), m.group(1).strip()))
+    for m in IMG_PHOTO_RE.finditer(md):
+        matches.append((m.start(), m.end(), m.group(1).strip()))
+
+    if not matches:
+        return [(md, None)]
+
+    matches.sort(key=lambda x: x[0])
+    cursor = 0
+    for (s, e, raw) in matches:
+        if s > cursor:
+            segments.append((md[cursor:s], None))
+        segments.append(("", raw))  # место изображения
+        cursor = e
+    if cursor < len(md):
+        segments.append((md[cursor:], None))
+    return segments
+
+
+def extract_section_text(full_md: str, section: str) -> str:
+    """
+    Если есть название секции (## Заголовок), берём её содержимое до следующего заголовка того же/высшего уровня.
+    Если секции нет — возвращаем весь текст.
+    """
+    if not section:
+        return full_md
+    pattern = re.compile(rf"(?mi)^##\s+{re.escape(section)}\s*$")
+    m = pattern.search(full_md)
+    if not m:
+        return full_md
+    start = m.end()
+    m2 = re.search(r"(?m)^\s*#{1,2}\s+.+$", full_md[start:])
+    end = start + m2.start() if m2 else len(full_md)
+    return full_md[start:end].strip()
+
+
+def select_primary_doc(chunks: List[Chunk]) -> Tuple[Optional[str], Optional[str]]:
+    """Возвращает (relative_path, section_name) для top-1 чанка."""
+    if not chunks:
+        return None, None
+    primary = chunks[0]
+    return primary.path, (primary.section or "")
+
+
+def _md_links_to_html(text: str) -> str:
+    """Convert Markdown links [text](url) to HTML <a> while escaping other text safely."""
+    out = []
+    last = 0
+    for m in MD_LINK_RE.finditer(text):
+        s, e = m.span()
+        # escape text before link
+        out.append(html.escape(text[last:s]))
+        link_text = html.escape(m.group(1))
+        href = m.group(2)
+        # minimal sanitization: disallow quotes in href
+        href = href.replace('"', "&quot;")
+        out.append(f'<a href="{href}">{link_text}</a>')
+        last = e
+    out.append(html.escape(text[last:]))
+    return "".join(out)
+
+
+async def send_text_chunks(message: Message, text: str):
+    """Отправляет текст, деля на части не длиннее лимита Telegram, сохраняя гиперссылки."""
+    # Convert markdown links to HTML anchors and escape the rest
+    html_text = _md_links_to_html(text.strip())
+    t = html_text
+    while t:
+        part = t[:TELEGRAM_MSG_LIMIT]
+        if len(t) > TELEGRAM_MSG_LIMIT:
+            # try not to break inside an anchor by cutting at a safe boundary
+            cut = part.rfind("</a>")
+            if cut != -1 and cut > TELEGRAM_MSG_LIMIT - 500:
+                cut += len("</a>")
+            else:
+                cut = part.rfind("\n")
+                if cut < 500:
+                    cut = part.rfind(" ")
+                if cut > 200:
+                    part = part[:cut]
+        await message.answer(part, parse_mode="HTML")
+        t = t[len(part):]
+
+
+async def render_markdown_with_inline_images(message: Message, rel_path: str, section: str):
+    """
+    Рендерит указанный Markdown (или его секцию) и отправляет последовательность сообщений:
+    текст -> фото -> текст -> ...
+    Также передаёт внешние ссылки как кликабельные гиперссылки в тексте.
+    """
+    base_dir = (settings.data_dir / Path(rel_path)).parent.resolve()
+    file_path = (settings.data_dir / rel_path).resolve()
+    if not file_path.is_file():
+        return False
+    md = read_text_file(file_path)
+    section_md = extract_section_text(md, section)
+    segments = split_markdown_into_segments(section_md)
+
+    any_output = False
+    for text_seg, image_raw in segments:
+        if text_seg and text_seg.strip():
+            await send_text_chunks(message, text_seg)
+            any_output = True
+        if image_raw:
+            p = try_resolve_path(image_raw, base_dir)
+            if p and p.suffix.lower() in IMAGE_EXTS and p.is_file():
+                try:
+                    await message.answer_photo(photo=FSInputFile(str(p)))
+                    any_output = True
+                except Exception:
+                    pass
+    return any_output
 
 
 def normalize_name(text: str) -> List[str]:
@@ -224,22 +367,44 @@ async def handle_question(message: Message):
         log_query(message.from_user, question, [], msg, "ERROR", has_attachment)
         return await message.answer(msg)
 
-    answer = generate_answer(question, context, chunks, status)
+    # Попытка "инлайн-рендера" основной секции Markdown, если там есть изображения
+    inline_rendered = False
+    if status == "OK" and chunks:
+        rel_path, section = select_primary_doc(chunks)
+        if rel_path:
+            try_path = (settings.data_dir / rel_path).resolve()
+            if try_path.is_file():
+                full_md = read_text_file(try_path)
+                sec_md = extract_section_text(full_md, section or "")
+                if IMG_MD_RE.search(sec_md) or IMG_PHOTO_RE.search(sec_md) or MD_LINK_RE.search(sec_md) or LINK_RE.search(sec_md):
+                    inline_rendered = await render_markdown_with_inline_images(
+                        message, rel_path, section or ""
+                    )
+                    if inline_rendered:
+                        from pathlib import Path as _P
+                        _src = str(_P(rel_path).with_suffix(""))
+                        await message.answer(f"Источник: {_src}")
 
-    # поиск фото по извлечённым фрагментам и вопросу
-    photos = find_photos(question, chunks)
-
-    srcs = [c.path for c in chunks][:5]
-    log_query(message.from_user, question, srcs, answer, status, has_attachment)
-
-    # Сначала отправляем текстовый ответ, затем фото отдельными сообщениями
-    await message.answer(answer)
-    for p in photos[:MAX_RETURN_PHOTOS]:
-        try:
-            await message.answer_photo(photo=FSInputFile(str(p)))
-        except Exception:
-            # не падаем, если фото не отправилось
-            pass
+    if not inline_rendered:
+        # Стандартный режим: LLM-ответ + (опционально) фото после ответа
+        answer = generate_answer(question, context, chunks, status)
+        # Фото ищем только в основном (primary) документе, чтобы исключить «утечку» чужих изображений
+        rel_path, _ = select_primary_doc(chunks)
+        primary_chunks = [c for c in chunks if c.path == rel_path][:1] if rel_path else chunks[:1]
+        photos = find_photos(question, primary_chunks)
+        srcs = [c.path for c in chunks][:5]
+        log_query(message.from_user, question, srcs, answer, status, has_attachment)
+        await message.answer(answer)
+        for p in photos[:MAX_RETURN_PHOTOS]:
+            try:
+                await message.answer_photo(photo=FSInputFile(str(p)))
+            except Exception:
+                # не падаем, если фото не отправилось
+                pass
+    else:
+        # Логируем: мы отправили поток секции вместо единого LLM-текста
+        srcs = [c.path for c in chunks][:5]
+        log_query(message.from_user, question, srcs, "<inline_markdown>", status, has_attachment)
 
 
 async def main():

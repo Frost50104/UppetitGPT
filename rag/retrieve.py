@@ -62,17 +62,18 @@ def apply_bonuses(query_norm: str, meta_rec: Dict, base_score: float) -> float:
     score = float(base_score)
     title = (meta_rec.get("title") or "").lower()
     section = (meta_rec.get("section") or "").lower()
+    path = (meta_rec.get("path") or "").lower()
 
-    # exact term presence bonus in title/section
+    # exact term presence bonus in title/section/path (усилено)
     for token in set(query_norm.split()):
-        if token and (token in title or token in section):
-            score += 0.02
+        if not token or len(token) < 3:
+            continue
+        if token in title or token in section or token in path:
+            score += 0.05
 
-    # keyword boosts
+    # keyword boosts (оставляем как было, с проверкой пути/заголовка/секции)
     for kw, bonus in KEYWORD_BOOSTS.items():
         if kw in query_norm:
-            # if path/title/section include related area, add
-            path = (meta_rec.get("path") or "").lower()
             if kw.split()[0] in path or kw in title or kw in section:
                 score += bonus
     return score
@@ -130,7 +131,9 @@ def retrieve(query: str) -> Tuple[List[Chunk], str, str]:
     for c in chunks:
         if used >= settings.max_ctx_chars:
             break
-        piece = f"[Источник: {c.path}]\n{c.text}\n"
+        from pathlib import Path as _P
+        _src = str(_P(c.path).with_suffix(""))
+        piece = f"[Источник: {_src}]\n{c.text}\n"
         if used + len(piece) > settings.max_ctx_chars:
             piece = piece[: settings.max_ctx_chars - used]
         ctx_parts.append(piece)
