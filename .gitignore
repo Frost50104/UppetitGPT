@@ -39,3 +39,7 @@ htmlcov/
 # Sensitive spreadsheets
 # Ignore shop information Excel file
 /data/Информация о магазинах.xlsx
+
+# Shop data (ignore store directory and JSON)
+/data/Магазины/
+/data/Информация о магазинах.json

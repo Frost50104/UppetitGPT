@@ -258,9 +258,140 @@ def find_photos(question: str, chunks: List[Chunk]) -> List[Path]:
     return results
 
 
-def is_allowed(chat_id: int, user_id: int) -> bool:
-    allow = settings.allowed_chat_ids
+# --- Access Control & Store Mapping ---
+import json
+from functools import lru_cache
+
+# Support both capitalized and lowercased filenames just in case
+_DATA_DIR = get_settings().data_dir
+STORE_INFO_JSON_PRIMARY = (_DATA_DIR / "Информация о магазинах.json").resolve()
+STORE_INFO_JSON_ALT = (_DATA_DIR / "информация о магазинах.json").resolve()
+STORE_INFO_XLSX = (_DATA_DIR / "Информация о магазинах.xlsx").resolve()
+
+try:
+    from openpyxl import load_workbook  # optional fallback
+except Exception:
+    load_workbook = None
+
+
+def _try_load_json(path: Path) -> dict[int, str]:
+    mapping: dict[int, str] = {}
+    try:
+        if path.is_file():
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    try:
+                        uid = int(str(k).strip())
+                        addr = str(v).strip()
+                        if addr:
+                            mapping[uid] = addr
+                    except Exception:
+                        continue
+            elif isinstance(data, list):
+                def norm_key(s: str) -> str:
+                    return str(s or "").strip().lower()
+                for row in data:
+                    if not isinstance(row, dict):
+                        continue
+                    keys = {norm_key(k): k for k in row.keys()}
+                    user_key = next((keys[x] for x in [
+                        "user id", "userid", "telegram id", "telegram user id", "id", "user_id", "telegram_id"
+                    ] if x in keys), None)
+                    addr_key = next((keys[x] for x in [
+                        "адрес", "address", "магазин", "store", "точка", "location", "address_exact"
+                    ] if x in keys), None)
+                    if not user_key:
+                        continue
+                    # derive address
+                    addr_val = None
+                    if addr_key:
+                        addr_val = row.get(addr_key)
+                    if (not addr_val) and ("file_name" in keys):
+                        # try to get address from file_name by stripping extension
+                        fn_key = keys["file_name"]
+                        fn = str(row.get(fn_key) or "").strip()
+                        if fn:
+                            from pathlib import Path as _P
+                            addr_val = _P(fn).stem
+                    try:
+                        uid = int(str(row[user_key]).strip())
+                        addr = str(addr_val or "").strip().strip()
+                        # normalize some stray trailing commas/spaces
+                        addr = addr.strip().strip(", ")
+                        if addr:
+                            mapping[uid] = addr
+                    except Exception:
+                        continue
+    except Exception:
+        return {}
+    return mapping
+
+
+@lru_cache(maxsize=1)
+def _load_user_store_map() -> dict[int, str]:
+    """
+    Loads user->store mapping from JSON file 'Информация о магазинах.json' (preferred).
+    Supports two JSON formats:
+      1) Dict: {"5658016805": "Адрес"}
+      2) List of objects: [{"User ID": 5658016805, "Адрес": "..."}, ...]
+    Falls back to Excel 'Информация о магазинах.xlsx' if JSON not present/empty and openpyxl available.
+    """
+    # Try JSON primary then alt
+    mapping = _try_load_json(STORE_INFO_JSON_PRIMARY)
+    if not mapping:
+        mapping = _try_load_json(STORE_INFO_JSON_ALT)
+    if mapping:
+        return mapping
+
+    # Fallback to Excel
+    try:
+        if load_workbook and STORE_INFO_XLSX.is_file():
+            wb = load_workbook(filename=str(STORE_INFO_XLSX), data_only=True)
+            ws = wb.active
+            headers = {}
+            for idx, cell in enumerate(next(ws.iter_rows(min_row=1, max_row=1)), start=1):
+                val = cell.value
+                key = (val.strip().lower() if isinstance(val, str) else str(val).strip().lower())
+                headers[key] = idx
+            user_col = None
+            addr_col = None
+            for key, col in headers.items():
+                if key in ("user id", "userid", "telegram id", "telegram user id", "id"):
+                    user_col = col
+                if key in ("адрес", "address", "магазин", "store", "точка", "location"):
+                    addr_col = col
+            if user_col and addr_col:
+                for row in ws.iter_rows(min_row=2):
+                    uid_cell = row[user_col - 1].value
+                    addr_cell = row[addr_col - 1].value
+                    if uid_cell is None or addr_cell is None:
+                        continue
+                    try:
+                        uid = int(str(uid_cell).strip())
+                        addr = str(addr_cell).strip()
+                        if addr:
+                            mapping[uid] = addr
+                    except Exception:
+                        continue
+    except Exception:
+        pass
+    return mapping
+
+
+def is_admin(chat_id: int, user_id: int) -> bool:
+    allow = settings.allowed_chat_ids or []
     return (chat_id in allow) or (user_id in allow)
+
+
+def is_allowed(chat_id: int, user_id: int) -> bool:
+    # Администратор всегда имеет доступ; иначе — если есть привязка в JSON/XLSX
+    return is_admin(chat_id, user_id) or (user_id in _load_user_store_map())
+
+
+def get_user_store(user_id: int) -> Optional[str]:
+    return _load_user_store_map().get(user_id)
 
 
 def log_query(user: User, question: str, sources: List[str], answer: str, status: str, has_attachment: bool):
@@ -323,7 +454,16 @@ async def handle_kb(message: Message, command: CommandObject):
     q = (command.args or "").strip()
     if not q:
         return await message.answer("Использование: /kb <запрос>")
-    chunks, _, status = retrieve(q)
+
+    admin = is_admin(message.chat.id, message.from_user.id)
+    user_store = get_user_store(message.from_user.id) if not admin else None
+
+    chunks, _, status = retrieve(q if admin or not user_store else f"{user_store} — {q}")
+
+    if user_store and not admin:
+        addr_norm = user_store.lower()
+        chunks = [c for c in chunks if (addr_norm in (c.title or '').lower() or addr_norm in (c.section or '').lower() or addr_norm in (c.text or '').lower() or addr_norm in (c.path or '').lower())]
+
     if not chunks:
         return await message.answer("Ничего не найдено.")
     lines = ["Топ разделов:"]
@@ -359,12 +499,43 @@ async def handle_question(message: Message):
         log_query(message.from_user, "<no_text>", [], "", "NO_CONTEXT", has_attachment)
         return await message.answer("Я обрабатываю только текстовые вопросы. Прикрепления зафиксированы.")
 
+    admin = is_admin(message.chat.id, message.from_user.id)
+    user_store = get_user_store(message.from_user.id) if not admin else None
+
     try:
-        chunks, context, status = retrieve(question)
+        q_eff = question if admin or not user_store else f"{user_store} — {question}"
+        chunks, context, status = retrieve(q_eff)
+        if user_store and not admin:
+            addr_norm = user_store.lower()
+            filtered = [c for c in chunks if (addr_norm in (c.title or '').lower() or addr_norm in (c.section or '').lower() or addr_norm in (c.text or '').lower() or addr_norm in (c.path or '').lower())]
+            chunks = filtered
+            # rebuild context to include only filtered chunks
+            if chunks:
+                from pathlib import Path as _P
+                ctx_parts = []
+                used = 0
+                for c in chunks:
+                    if used >= settings.max_ctx_chars:
+                        break
+                    _src = str(_P(c.path).with_suffix(""))
+                    piece = f"[Источник: {_src}]\n{c.text}\n"
+                    if used + len(piece) > settings.max_ctx_chars:
+                        piece = piece[: settings.max_ctx_chars - used]
+                    ctx_parts.append(piece)
+                    used += len(piece)
+                context = "\n\n".join(ctx_parts)
+            else:
+                context = ""
     except Exception as e:
         # Index not built or other error
         msg = "Индекс не готов. Попросите администратора выполнить построение индекса: python -m rag.index_build"
         log_query(message.from_user, question, [], msg, "ERROR", has_attachment)
+        return await message.answer(msg)
+
+    # Если у пользователя есть привязка к точке и после фильтра ничего не осталось — честно сообщим
+    if (user_store and not admin) and not chunks:
+        msg = "По вашей торговой точке пока нет информации для данного запроса. Уточните вопрос или обратитесь к администратору."
+        log_query(message.from_user, question, [], msg, "NO_CONTEXT", has_attachment)
         return await message.answer(msg)
 
     # Попытка "инлайн-рендера" основной секции Markdown, если там есть изображения

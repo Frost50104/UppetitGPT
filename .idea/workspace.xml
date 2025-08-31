@@ -5,25 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="819f605b-6f54-4554-8a80-5743dbc4ec33" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/UppetitGPT.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/UppetitGPT.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Акции и специальные предложения.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Справочная информация/Акции и специальные предложения.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Дезинсекция.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Регламенты/Дезинсекция.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Инструкция по работе с кассой.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Регламенты/Инструкция по работе с кассой.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Интернет.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Решение проблем/Интернет.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Карьерный рост.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Справочная информация/Карьерный рост.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Кондиционер.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Решение проблем/Кондиционер.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Кофемашина.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Решение проблем/Кофемашина.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Мониторы.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Решение проблем/Мониторы.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Музыка.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Решение проблем/Музыка.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Наша продукция.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Справочная информация/Наша продукция.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/О компании.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Справочная информация/О компании.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Правила внутренней коммуникации.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Справочная информация/Правила внутренней коммуникации.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Работа с гостями.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Справочная информация/Работа с гостями.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Распорядок дня.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Регламенты/Распорядок дня.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Список магазинов.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/Холодильники.md" beforeDir="false" afterPath="$PROJECT_DIR$/data/Решение проблем/Холодильники.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/bot.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rag/llm.py" beforeDir="false" afterPath="$PROJECT_DIR$/rag/llm.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,27 +39,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.bot.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "jsx.switch.disabled": "true",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "/Users/petrpopov/Documents/PycharmProjects/pythonProjects/UppetitGPT/data/Сотрудники офиса",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "to.speed.mode.migration.done": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.bot.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;jsx.switch.disabled&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/petrpopov/Documents/PycharmProjects/pythonProjects/UppetitGPT/data/Сотрудники офиса&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/data/Сотрудники офиса" />
@@ -104,6 +90,7 @@
       <workItem from="1756379887575" duration="15978000" />
       <workItem from="1756643290389" duration="122000" />
       <workItem from="1756643443089" duration="4722000" />
+      <workItem from="1756655891003" duration="4626000" />
     </task>
     <servers />
   </component>
@@ -111,6 +98,6 @@
     <option name="version" value="3" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/UppetitGPT$bot.coverage" NAME="bot Coverage Results" MODIFIED="1756651110732" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/UppetitGPT$bot.coverage" NAME="bot Coverage Results" MODIFIED="1756660339182" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
