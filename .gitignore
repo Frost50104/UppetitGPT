@@ -35,3 +35,7 @@ index/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Sensitive spreadsheets
+# Ignore shop information Excel file
+/data/Информация о магазинах.xlsx
